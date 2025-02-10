@@ -43,7 +43,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         _isGlutenFree = data['IsGlutenFree'] ?? false;
 
         _macros['Breakfast']?['Protein'] = data['BreakfastProtein'] ?? 0;
-        _macros['Breakfast']?['Carbohydrates'] = data['BreakfastCarbohydrates'] ?? 0;
+        _macros['Breakfast']?['Carbohydrates'] =
+            data['BreakfastCarbohydrates'] ?? 0;
         _macros['Breakfast']?['Fat'] = data['BreakfastFat'] ?? 0;
         _macros['Breakfast']?['Calories'] = data['BreakfastCalories'] ?? 0;
 
@@ -62,14 +63,14 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         _macros['Brunch']?['Fat'] = data['BrunchFat'] ?? 0;
         _macros['Brunch']?['Calories'] = data['BrunchCalories'] ?? 0;
       });
-
     } else {
       // Handle error
       print('Failed to load user preferences');
     }
   }
 
-  Future<void> _updateDietaryRestriction(String restrictionName, bool restrictionValue) async {
+  Future<void> _updateDietaryRestriction(
+      String restrictionName, bool restrictionValue) async {
     final userId = await _getUserId();
     final url = Uri.parse(Config.getUrl('updateDietaryRestriction', {
       'userId': userId,
@@ -91,7 +92,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     }
   }
 
-  Future<void> _updateMacro(String mealType, String macroName, int macroValue) async {
+  Future<void> _updateMacro(
+      String mealType, String macroName, int macroValue) async {
     final userId = await _getUserId();
     final url = Uri.parse(Config.getUrl('updateMacro', {
       'userId': userId,
@@ -101,13 +103,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     }));
     final response = await http.put(url);
 
-    if (response.statusCode == 200) {
-      // Macro updated successfully
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Macro updated successfully')),
-      );
-    } else {
-      // Failed to update macro
+    if (response.statusCode != 200) {
+      // Only show SnackBar if there's an error
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to update macro')),
       );
@@ -122,101 +119,100 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Theme(
-        data: ThemeData(
-          primaryColor:  Color(0xFFAB8532),
-          scaffoldBackgroundColor: Colors.blueGrey[900],
-          appBarTheme:  AppBarTheme(
-            backgroundColor: Colors.blueGrey[900],
-            elevation: 0,
-            iconTheme: IconThemeData(color: Colors.white),
-            titleTextStyle: TextStyle(color: Colors.white),
-          ),
-          textTheme: const TextTheme(
-            bodyLarge: TextStyle(color: Colors.white),
-            bodyMedium: TextStyle(color: Colors.white),
-          ),
-          sliderTheme: const SliderThemeData(
-            activeTrackColor: const Color(0xFFAB8532),
-            inactiveTrackColor: Colors.grey,
-            thumbColor: const Color(0xFFAB8532),
-            overlayColor: const Color(0x29AB8532),
-            valueIndicatorColor: const Color(0xFFAB8532),
-          ),
-
+      data: ThemeData(
+        primaryColor: Color(0xFFAB8532),
+        scaffoldBackgroundColor: Colors.blueGrey[900],
+        appBarTheme: AppBarTheme(
+          backgroundColor: Colors.blueGrey[900],
+          elevation: 0,
+          iconTheme: IconThemeData(color: Colors.white),
+          titleTextStyle: TextStyle(color: Colors.white),
         ),
-
-    child: Scaffold(
-      appBar: AppBar(
-        title: Text('User Profile'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.remove('userId');
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => AuthScreen()),
-              );
-            },
-            tooltip: 'Logout',
-          ),
-        ],
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(color: Colors.white),
+          bodyMedium: TextStyle(color: Colors.white),
+        ),
+        sliderTheme: const SliderThemeData(
+          activeTrackColor: const Color(0xFFAB8532),
+          inactiveTrackColor: Colors.grey,
+          thumbColor: const Color(0xFFAB8532),
+          overlayColor: const Color(0x29AB8532),
+          valueIndicatorColor: const Color(0xFFAB8532),
+        ),
       ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Preferences',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('User Profile'),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.logout),
+              onPressed: () async {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.remove('userId');
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => AuthScreen()),
+                );
+              },
+              tooltip: 'Logout',
             ),
-            SizedBox(height: 16),
-            _buildPreferenceToggle('Vegan', _isVegan, (value) {
-              setState(() {
-                _isVegan = value;
-              });
-              _updateDietaryRestriction('IsVegan', value);
-            }),
-            _buildPreferenceToggle('Vegetarian', _isVegetarian, (value) {
-              setState(() {
-                _isVegetarian = value;
-              });
-              _updateDietaryRestriction('IsVegetarian', value);
-            }),
-            _buildPreferenceToggle('GlutenFree', _isGlutenFree, (value) {
-              setState(() {
-                _isGlutenFree = value;
-              });
-              _updateDietaryRestriction('IsGlutenFree', value);
-            }),
-            const SizedBox(height: 24),
-            Text(
-              'Nutritional Goals',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            SizedBox(height: 16),
-            _buildMacroSection('Breakfast'),
-            _buildMacroSection('Lunch'),
-            _buildMacroSection('Brunch'),
-            _buildMacroSection('Dinner'),
           ],
         ),
+        body: SingleChildScrollView(
+          padding: EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Preferences',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 16),
+              _buildPreferenceToggle('Vegan', _isVegan, (value) {
+                setState(() {
+                  _isVegan = value;
+                });
+                _updateDietaryRestriction('IsVegan', value);
+              }),
+              _buildPreferenceToggle('Vegetarian', _isVegetarian, (value) {
+                setState(() {
+                  _isVegetarian = value;
+                });
+                _updateDietaryRestriction('IsVegetarian', value);
+              }),
+              _buildPreferenceToggle('GlutenFree', _isGlutenFree, (value) {
+                setState(() {
+                  _isGlutenFree = value;
+                });
+                _updateDietaryRestriction('IsGlutenFree', value);
+              }),
+              const SizedBox(height: 24),
+              Text(
+                'Nutritional Goals',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 16),
+              _buildMacroSection('Breakfast'),
+              _buildMacroSection('Lunch'),
+              _buildMacroSection('Brunch'),
+              _buildMacroSection('Dinner'),
+            ],
+          ),
+        ),
       ),
-    ),
     );
   }
 
-  Widget _buildPreferenceToggle(String label, bool value, ValueChanged<bool> onChanged) {
+  Widget _buildPreferenceToggle(
+      String label, bool value, ValueChanged<bool> onChanged) {
     return SwitchListTile(
-         title: Text(
+      title: Text(
         label,
         style: const TextStyle(color: Colors.white),
       ),
@@ -240,13 +236,16 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           ),
         ),
         SizedBox(height: 8),
-        _buildMacroSlider(mealType, 'Protein', _macros[mealType]!['Protein']!, (value) {
+        _buildMacroSlider(mealType, 'Protein', _macros[mealType]!['Protein']!,
+            (value) {
           setState(() {
             _macros[mealType]!['Protein'] = value.round();
           });
           _updateMacro(mealType, 'Protein', value.round());
         }, 120),
-        _buildMacroSlider(mealType, 'Carbohydrates', _macros[mealType]!['Carbohydrates']!, (value) {
+        _buildMacroSlider(
+            mealType, 'Carbohydrates', _macros[mealType]!['Carbohydrates']!,
+            (value) {
           setState(() {
             _macros[mealType]!['Carbohydrates'] = value.round();
           });
@@ -258,7 +257,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           });
           _updateMacro(mealType, 'Fat', value.round());
         }, 120),
-        _buildMacroSlider(mealType, 'Calories', _macros[mealType]!['Calories']!, (value) {
+        _buildMacroSlider(mealType, 'Calories', _macros[mealType]!['Calories']!,
+            (value) {
           setState(() {
             _macros[mealType]!['Calories'] = value.round();
           });
@@ -269,7 +269,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
   }
 
-  Widget _buildMacroSlider(String mealType, String macroName, int value, ValueChanged<double> onChanged, double max) {
+  Widget _buildMacroSlider(String mealType, String macroName, int value,
+      ValueChanged<double> onChanged, double max) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
