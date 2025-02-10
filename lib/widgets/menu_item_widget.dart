@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class MenuItemWidget extends StatefulWidget {
   final Map<String, dynamic> menuItem;
   final Function(int, int) onRatingUpdate;
-  final Function(int, int) getUserRating;
+  final Future<int> Function(int, int) getUserRating;
   final bool isRecommended;
 
   const MenuItemWidget({
@@ -14,15 +14,14 @@ class MenuItemWidget extends StatefulWidget {
     required this.menuItem,
     required this.onRatingUpdate,
     required this.getUserRating,
-    this.isRecommended = false
+    this.isRecommended = false,
   }) : super(key: key);
 
   @override
   _MenuItemWidgetState createState() => _MenuItemWidgetState();
 }
 
-class _MenuItemWidgetState extends State<MenuItemWidget>
-    with SingleTickerProviderStateMixin {
+class _MenuItemWidgetState extends State<MenuItemWidget> with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _expandAnimation;
   bool _isExpanded = false;
@@ -33,7 +32,7 @@ class _MenuItemWidgetState extends State<MenuItemWidget>
     super.initState();
     _animationController = AnimationController(
       vsync: this,
-      duration: Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 300),
     );
     _expandAnimation = CurvedAnimation(
       parent: _animationController,
@@ -49,6 +48,7 @@ class _MenuItemWidgetState extends State<MenuItemWidget>
   }
 
   void _toggleExpand() {
+    if (!mounted) return;
     setState(() {
       _isExpanded = !_isExpanded;
       if (_isExpanded) {
@@ -61,6 +61,7 @@ class _MenuItemWidgetState extends State<MenuItemWidget>
 
   void _updateRating(int rating) async {
     final userId = await getUserId();
+    if (!mounted) return;
     setState(() {
       _userRating = rating;
     });
@@ -71,6 +72,7 @@ class _MenuItemWidgetState extends State<MenuItemWidget>
     try {
       final userId = await getUserId();
       final userRating = await widget.getUserRating(userId, widget.menuItem['id']);
+      if (!mounted) return;
       setState(() {
         _userRating = userRating;
       });
@@ -93,12 +95,12 @@ class _MenuItemWidgetState extends State<MenuItemWidget>
         InkWell(
           onTap: _toggleExpand,
           child: Container(
-            padding: EdgeInsets.all(16),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.blueGrey[900],
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: Color(0xFFAB8532),
+                color: const Color(0xFFAB8532),
                 width: borderWidth,
               ),
             ),
@@ -108,7 +110,7 @@ class _MenuItemWidgetState extends State<MenuItemWidget>
                 Expanded(
                   child: Text(
                     widget.menuItem['name'],
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 18,
                       color: Colors.white,
@@ -124,13 +126,13 @@ class _MenuItemWidgetState extends State<MenuItemWidget>
         SizeTransition(
           sizeFactor: _expandAnimation,
           child: Container(
-            margin: EdgeInsets.only(top: 8),
-            padding: EdgeInsets.all(16),
+            margin: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: Colors.blueGrey[800],
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: Color(0xFFAB8532),
+                color: const Color(0xFFAB8532),
                 width: 1.5,
               ),
               boxShadow: [
@@ -138,7 +140,7 @@ class _MenuItemWidgetState extends State<MenuItemWidget>
                   color: Colors.black.withOpacity(0.3),
                   spreadRadius: 2,
                   blurRadius: 5,
-                  offset: Offset(0, 3),
+                  offset: const Offset(0, 3),
                 ),
               ],
             ),
@@ -148,7 +150,7 @@ class _MenuItemWidgetState extends State<MenuItemWidget>
                   menuItem: widget.menuItem,
                   userRating: _userRating,
                 ),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 _buildStarRating(),
               ],
             ),

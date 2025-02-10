@@ -5,6 +5,7 @@ import 'package:rosedine/url_config.dart';
 import 'dart:convert';
 import 'package:rosedine/widgets/custom_button_widget.dart';
 import 'package:rosedine/widgets/custom_text_widget.dart' as custom_widget;
+import 'package:rosedine/widgets/centered_error_overlay.dart'; // Import our new overlay
 import 'package:shared_preferences/shared_preferences.dart';
 import 'schedule_screen.dart';
 import 'onboarding_screen.dart';
@@ -23,6 +24,11 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
+
+  // State for showing a loading indicator
+  bool _isLoading = false;
+  // State for holding an error message when login fails
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -59,23 +65,43 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   }
 
   Future<void> _submitForm() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null; // Clear any previous error.
+    });
     final email = _emailController.text;
     final password = _passwordController.text;
 
-    final url = Uri.parse(Config.getUrl('login'));
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({'email': email, 'password': password}),
-    );
+    try {
+      final url = Uri.parse(Config.getUrl('login'));
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'email': email, 'password': password}),
+      );
 
-    if (response.statusCode == 200) {
-      final userId = response.body;
-      await _saveUserId(userId);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Login successful')));
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => ScheduleScreen()));
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to log in: ${response.body}')));
+      if (response.statusCode == 200) {
+        final userId = response.body;
+        await _saveUserId(userId);
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => ScheduleScreen()),
+        );
+      } else {
+        // Instead of showing a snackbar, store the error message
+        setState(() {
+          _errorMessage = 'Failed to log in: ${response.body}';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'An error occurred: $e';
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
@@ -107,103 +133,136 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
 
     return Scaffold(
       backgroundColor: Colors.blueGrey[900],
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const SizedBox(height: 30),
-                  FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: ScaleTransition(
-                      scale: _scaleAnimation,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          Container(
-                            width: 330,
-                            height: 330,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: Color(0xFFAB8532),
-                                width: 2,
-                              ),
-                            ),
-                            child: ClipOval(
-                              child: ShaderMask(
-                                shaderCallback: (Rect bounds) {
-                                  return RadialGradient(
-                                    center: Alignment.center,
-                                    radius: 0.8,
-                                    colors: [Colors.white, Colors.white.withOpacity(0.0)],
-                                  ).createShader(bounds);
-                                },
-                                blendMode: BlendMode.dstIn,
-                                child: Transform.scale(
-                                  scale: 1,
-                                  child: Image.asset(
-                                    'assets/RoseDine.jpg',
-                                    fit: BoxFit.cover,
+      body: Stack(
+        children: [
+          SafeArea(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 30),
+                      FadeTransition(
+                        opacity: _fadeAnimation,
+                        child: ScaleTransition(
+                          scale: _scaleAnimation,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Container(
+                                width: 330,
+                                height: 330,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: const Color(0xFFAB8532),
+                                    width: 2,
+                                  ),
+                                ),
+                                child: ClipOval(
+                                  child: ShaderMask(
+                                    shaderCallback: (Rect bounds) {
+                                      return RadialGradient(
+                                        center: Alignment.center,
+                                        radius: 0.8,
+                                        colors: [Colors.white, Colors.white.withOpacity(0.0)],
+                                      ).createShader(bounds);
+                                    },
+                                    blendMode: BlendMode.dstIn,
+                                    child: Transform.scale(
+                                      scale: 1,
+                                      child: Image.asset(
+                                        'assets/RoseDine.jpg',
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 40),
-                  Center(
-                    child: Text(
-                      selectedMessage,
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                      const SizedBox(height: 40),
+                      Center(
+                        child: Text(
+                          selectedMessage,
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
-                      textAlign: TextAlign.center,
-                    ),
+                      const SizedBox(height: 30),
+                      custom_widget.CustomTextField(
+                        controller: _emailController,
+                        labelText: 'Email *',
+                        keyboardType: TextInputType.emailAddress,
+                        obscureText: false,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Email is required';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 30),
+                      custom_widget.CustomTextField(
+                        controller: _passwordController,
+                        labelText: 'Password *',
+                        obscureText: true,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Password is required';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 30),
+                      MyButton(
+                        onTap: _submitForm,
+                        text: 'Login',
+                      ),
+                      const SizedBox(height: 20),
+                      MyButton(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => OnboardingScreen()),
+                          );
+                        },
+                        text: 'Create an Account',
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 30),
-                  custom_widget.CustomTextField(
-                    controller: _emailController,
-                    labelText: 'Email',
-                    keyboardType: TextInputType.emailAddress,
-                    obscureText: false,
-                  ),
-                  const SizedBox(height: 30),
-                  custom_widget.CustomTextField(
-                    controller: _passwordController,
-                    labelText: 'Password',
-                    obscureText: true, // Ensures the text is obscured for password input
-                  ),
-                  const SizedBox(height: 30),
-                  MyButton(
-                    onTap: () {
-                      if (_formKey.currentState!.validate()) {
-                        _submitForm();
-                      }
-                    },
-                    text: 'Login',
-                  ),
-                  const SizedBox(height: 20),
-                  MyButton(
-                    onTap: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context) => OnboardingScreen()));
-                    },
-                    text: 'Create an Account',
-                  ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
+          // Loading overlay
+          if (_isLoading)
+            Container(
+              color: Colors.black.withOpacity(0.5),
+              child: const Center(
+                child: CircularProgressIndicator(),
+              ),
+            ),
+          // Error overlay (if _errorMessage is set)
+          if (_errorMessage != null)
+            CenteredErrorOverlay(
+              title: 'Login Failed',
+              errorMessage: _errorMessage!,
+              onDismiss: () {
+                setState(() {
+                  _errorMessage = null;
+                });
+              },
+            ),
+        ],
       ),
     );
   }

@@ -4,13 +4,15 @@ import 'package:rosedine/url_config.dart';
 import 'dart:convert';
 import 'package:rosedine/widgets/custom_text_widget.dart' as custom_widget;
 import 'package:rosedine/widgets/custom_button_widget.dart';
+import 'package:rosedine/widgets/centered_error_overlay.dart'; // Our unified error overlay widget
 
 class OnboardingScreen extends StatefulWidget {
   @override
   _OnboardingScreenState createState() => _OnboardingScreenState();
 }
 
-class _OnboardingScreenState extends State<OnboardingScreen> with SingleTickerProviderStateMixin {
+class _OnboardingScreenState extends State<OnboardingScreen>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _fnameController = TextEditingController();
   final _lnameController = TextEditingController();
@@ -21,6 +23,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> with SingleTickerPr
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
+
+  // Error overlay state (only for server-side errors)
+  String? _errorMessage;
+  String _errorTitle = '';
 
   @override
   void initState() {
@@ -45,36 +51,47 @@ class _OnboardingScreenState extends State<OnboardingScreen> with SingleTickerPr
   }
 
   Future<void> _register() async {
+    // Retrieve the field values.
     final fname = _fnameController.text;
     final lname = _lnameController.text;
     final email = _emailController.text;
     final password = _passwordController.text;
 
     final url = Uri.parse(Config.getUrl('register'));
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({
-        'fname': fname,
-        'lname': lname,
-        'email': email,
-        'password': password
-      }),
-    );
-    if (response.statusCode == 200) {
-      final responseBody = response.body;
-      print('Response body: $responseBody');
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'fname': fname,
+          'lname': lname,
+          'email': email,
+          'password': password
+        }),
+      );
+      if (response.statusCode == 200) {
+        final responseBody = response.body;
+        print('Response body: $responseBody');
 
-      // Extract the JWT token from the response
-      final tokenStartIndex = responseBody.indexOf('Token: ') +
-          'Token: '.length;
-      _verificationToken = responseBody.substring(tokenStartIndex);
+        // Extract the token from the response (assuming it contains "Token: ..." in its body)
+        final tokenStartIndex =
+            responseBody.indexOf('Token: ') + 'Token: '.length;
+        _verificationToken = responseBody.substring(tokenStartIndex);
+        print('Verification token: $_verificationToken');
 
-      print('Verification token: $_verificationToken');
-      _showVerificationCodeDialog(email);
-    } else {
-      print('Registration failed: ${response.body}');
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Registration failed: ${response.body}')));
+        _showVerificationCodeDialog(email);
+      } else {
+        // Trigger the error overlay on server-side error.
+        setState(() {
+          _errorTitle = 'Registration Failed';
+          _errorMessage = 'Registration failed: ${response.body}';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorTitle = 'Registration Failed';
+        _errorMessage = 'An error occurred: $e';
+      });
     }
   }
 
@@ -129,25 +146,34 @@ class _OnboardingScreenState extends State<OnboardingScreen> with SingleTickerPr
     final lname = _lnameController.text;
     final email = _emailController.text;
     final password = _passwordController.text;
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({
-        'token': _verificationToken,
-        'code': code,
-        'fname': fname,
-        'lname': lname,
-        'email': email,
-        'password': password
-      }),
-    );
+    try {
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'token': _verificationToken,
+          'code': code,
+          'fname': fname,
+          'lname': lname,
+          'email': email,
+          'password': password
+        }),
+      );
 
-    if (response.statusCode == 200) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Email verified successfully')));
-      // Navigate to the login screen or perform any other necessary actions
-      Navigator.pushReplacementNamed(context, '/auth');
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Verification failed: ${response.body}')));
+      if (response.statusCode == 200) {
+        // On successful verification, navigate to the login screen.
+        Navigator.pushReplacementNamed(context, '/auth');
+      } else {
+        setState(() {
+          _errorTitle = 'Verification Failed';
+          _errorMessage = 'Verification failed: ${response.body}';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorTitle = 'Verification Failed';
+        _errorMessage = 'An error occurred: $e';
+      });
     }
   }
 
@@ -155,91 +181,124 @@ class _OnboardingScreenState extends State<OnboardingScreen> with SingleTickerPr
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.blueGrey[900],
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: ScaleTransition(
-                      scale: _scaleAnimation,
-                      child: Container(
-                        width: 280,
-                        height: 280,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Color(0xFFAB8532),
-                            width: 2,
-                          ),
-                        ),
-                        child: ClipOval(
-                          child: ShaderMask(
-                            shaderCallback: (Rect bounds) {
-                              return RadialGradient(
-                                center: Alignment.center,
-                                radius: 0.8,
-                                colors: [Colors.white, Colors.white.withOpacity(0.0)],
-                              ).createShader(bounds);
-                            },
-                            blendMode: BlendMode.dstIn,
-                            child: Image.asset(
-                              'assets/RoseDine.jpg',
-                              fit: BoxFit.cover,
+      body: Stack(
+        children: [
+          SafeArea(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      FadeTransition(
+                        opacity: _fadeAnimation,
+                        child: ScaleTransition(
+                          scale: _scaleAnimation,
+                          child: Container(
+                            width: 280,
+                            height: 280,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Color(0xFFAB8532),
+                                width: 2,
+                              ),
+                            ),
+                            child: ClipOval(
+                              child: ShaderMask(
+                                shaderCallback: (Rect bounds) {
+                                  return RadialGradient(
+                                    center: Alignment.center,
+                                    radius: 0.8,
+                                    colors: [Colors.white, Colors.white.withOpacity(0.0)],
+                                  ).createShader(bounds);
+                                },
+                                blendMode: BlendMode.dstIn,
+                                child: Image.asset(
+                                  'assets/RoseDine.jpg',
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
+                      const SizedBox(height: 40),
+                      // First and Last Name fields (optional)
+                      custom_widget.CustomTextField(
+                        controller: _fnameController,
+                        labelText: 'First Name',
+                      ),
+                      const SizedBox(height: 20),
+                      custom_widget.CustomTextField(
+                        controller: _lnameController,
+                        labelText: 'Last Name',
+                      ),
+                      const SizedBox(height: 20),
+                      // Email field with validation.
+                      custom_widget.CustomTextField(
+                        controller: _emailController,
+                        labelText: 'Email *',
+                        keyboardType: TextInputType.emailAddress,
+                        obscureText: false,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Email is required';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 20),
+                      // Password field with validation.
+                      custom_widget.CustomTextField(
+                        controller: _passwordController,
+                        labelText: 'Password *',
+                        obscureText: true,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Password is required';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 30),
+                      // Changed button text for registration.
+                      MyButton(
+                        onTap: () {
+                          if (_formKey.currentState!.validate()) {
+                            _register();
+                          }
+                        },
+                        text: 'Register Now',
+                      ),
+                      const SizedBox(height: 20),
+                      // Changed button text for navigating to login.
+                      MyButton(
+                        onTap: () {
+                          Navigator.pushReplacementNamed(context, '/auth');
+                        },
+                        text: 'Back to Login',
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 40),
-                  custom_widget.CustomTextField(
-                    controller: _fnameController,
-                    labelText: 'First Name',
-                  ),
-                  const SizedBox(height: 20),
-                  custom_widget.CustomTextField(
-                    controller: _lnameController,
-                    labelText: 'Last Name',
-                  ),
-                  const SizedBox(height: 20),
-                  custom_widget.CustomTextField(
-                    controller: _emailController,
-                    labelText: 'Email',
-                    keyboardType: TextInputType.emailAddress,
-                  ),
-                  const SizedBox(height: 20),
-                  custom_widget.CustomTextField(
-                    controller: _passwordController,
-                    labelText: 'Password',
-                    obscureText: true,
-                  ),
-                  const SizedBox(height: 30),
-                  MyButton(
-                    onTap: () {
-                      if (_formKey.currentState!.validate()) {
-                        _register();
-                      }
-                    },
-                    text: 'Register',
-                  ),
-                  const SizedBox(height: 20),
-                  MyButton(
-                    onTap: () {
-                      Navigator.pushReplacementNamed(context, '/auth');
-                    },
-                    text: 'Login',
-                  ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
+          // Centered error overlay appears only on server-side errors.
+          if (_errorMessage != null)
+            CenteredErrorOverlay(
+              title: _errorTitle,
+              errorMessage: _errorMessage!,
+              onDismiss: () {
+                setState(() {
+                  _errorMessage = null;
+                });
+              },
+            ),
+        ],
       ),
     );
   }
