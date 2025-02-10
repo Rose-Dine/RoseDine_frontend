@@ -6,13 +6,14 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:rosedine/auth.dart';
 import 'notification_service.dart';
 import 'onboarding_screen.dart';
+import 'dart:io' show Platform;
 
 final container = ProviderContainer();
 
   void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  if (!kIsWeb) {
+  if (!kIsWeb && !Platform.isIOS) {
     print('Requesting SCHEDULE_EXACT_ALARM permission...');
     await Permission.scheduleExactAlarm.request();
     print('Initializing AndroidAlarmManager...');
