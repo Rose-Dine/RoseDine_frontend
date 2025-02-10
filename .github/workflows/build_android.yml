@@ -1,5 +1,4 @@
 name: Android Build and Release
-
 on:
   push:
     branches: [ main ]
@@ -12,53 +11,40 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v3
-
+      - uses: actions/checkout@v4
+      
       - name: Set up Java
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
-
+          
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.24.0'
           channel: 'stable'
-
+          
       - name: Get dependencies
         run: flutter pub get
-
+        
       - name: Build APK
         env:
-          BASE_URL: ${{ secrets.BASE_URL }}  # Use secret to pass environment variable
+          BASE_URL: ${{ secrets.BASE_URL }}
         run: flutter build apk --release --dart-define=BASE_URL=$BASE_URL
-
-      - name: Upload APK
+        
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
-
+          
       - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
+        run: |
+          gh release create v${{ github.run_number }} \
+            --title "Release ${{ github.run_number }}" \
+            --notes "Release ${{ github.run_number }}" \
+            build/app/outputs/flutter-apk/app-release.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ github.run_number }}
-          release_name: Release ${{ github.run_number }}
-          draft: false
-          prerelease: false
-
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./build/app/outputs/flutter-apk/app-release.apk
-          asset_name: app-release.apk
-          asset_content_type: application/vnd.android.package-archive
